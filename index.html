@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="screen-orientation" content="landscape">
+    <title>Minecraft Clone</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- JOYSTICK -->
+    <div id="joystick-container"><div id="joystick-knob"></div></div>
+    <div id="sprint-btn">❯❯</div>
+
+    <!-- HUD -->
+    <div id="fps-counter">FPS: 0</div>
+    <div id="coords-display">
+        <span id="coord-xyz">X: 0  Y: 64  Z: 0</span>
+    </div>
+
+    <!-- MODAL CONFIRMACIÓN -->
+    <div id="modal-confirmacion">
+        <div class="modal-caja">
+            <div class="modal-texto" id="modal-texto"></div>
+            <div class="modal-botones">
+                <div class="modal-btn modal-btn-si" id="modal-btn-si">Aceptar</div>
+                <div class="modal-btn modal-btn-no" onclick="cerrarModal()">Cancelar</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA PRINCIPAL -->
+    <div id="pantalla-principal" class="pantalla-menu activa">
+        <div id="pp-fondo"></div>
+        <div id="pp-contenido">
+            <div id="pp-logo">
+                <div id="pp-logo-mc">MINECRAFT</div>
+                <div id="pp-logo-sub">CLONE</div>
+            </div>
+            <div class="btn-menu" onclick="mostrarPantallaJugar()">Jugar</div>
+            <div class="btn-menu" onclick="mostrarPantallaAjustes()">Ajustes</div>
+        </div>
+        <canvas id="pp-steve-canvas"></canvas>
+        <div id="btn-vestidor" onclick="abrirVestidor()">Vestidor</div>
+    </div>
+
+    <!-- PANTALLA AJUSTES -->
+    <div id="pantalla-ajustes" class="pantalla-menu">
+        <div class="menu-titulo">AJUSTES</div>
+        <div style="width:clamp(260px,85vw,420px); overflow-y:auto; max-height:70vh;">
+            <div style="background:#3a3a3a; border:3px solid #000; box-shadow:inset -3px -3px #222, inset 3px 3px #666; padding:16px; margin-bottom:12px;">
+                <div style="color:#aaa; font-size:clamp(10px,2.5vw,13px); letter-spacing:2px; margin-bottom:12px; text-align:center;">🎮 CONTROLES</div>
+                <div style="color:white; font-size:clamp(11px,2.5vw,13px); margin-bottom:6px;">Sensibilidad de cámara</div>
+                <input type="range" id="aj-sens" min="1" max="20" value="6" style="width:100%; margin-bottom:6px; touch-action:pan-x;" oninput="aplicarAjustes()" onchange="aplicarAjustes()">
+                <div class="btn-cancelar-mundo" style="margin-top:16px;" onclick="restaurarAjustes()">↺ Restaurar por defecto</div>
+                <div class="btn-crear-mundo" style="margin-top:8px;" onclick="entrarModoEdicionControles()">🕹️ Personalizar controles</div>
+            </div>
+        </div>
+        <div class="btn-volver-menu" onclick="mostrarPantallaPrincipal()">← Volver</div>
+    </div>
+
+    <!-- PANTALLA VESTIDOR -->
+    <div id="pantalla-vestidor" class="pantalla-menu">
+        <div id="vest-titulo" class="menu-titulo">VESTIDOR</div>
+        <div class="btn-volver-menu" style="right:16px; left:auto;" onclick="confirmarSkinVestidor()">Confirmar ✓</div>
+        <div id="vest-contenedor">
+            <div id="vest-izquierda">
+                <div id="vest-lista-skins"></div>
+            </div>
+            <div id="vest-derecha">
+                <canvas id="vest-steve-canvas"></canvas>
+            </div>
+        </div>
+        <div class="btn-volver-menu" onclick="cerrarVestidor()">← Volver</div>
+    </div>
+
+    <!-- PANTALLA JUGAR -->
+    <div id="pantalla-jugar" class="pantalla-menu">
+        <div class="menu-titulo">JUGAR</div>
+        <div class="tabs-container">
+            <div class="tab-btn activa" id="tab-mundos" onclick="cambiarTab('mundos')">🌍 Mundos</div>
+            <div class="tab-btn" id="tab-multi" onclick="cambiarTab('multi')">🌐 Multijugador</div>
+        </div>
+        <div class="tab-content activa" id="contenido-mundos">
+            <div class="btn-menu" style="background:#3a6a3a; margin-bottom:10px;" onclick="abrirPanelMundo()">+ Crear mundo nuevo</div>
+            <div id="lista-mundos"></div>
+        </div>
+        <div class="tab-content" id="contenido-multi">
+            <div id="estado-servidor" style="font-family:'Courier New',monospace; font-size:var(--font-btn); margin-bottom:12px; color:#ff0;">🟡 Sin conectar</div>
+            <div id="lista-salas"><div class="sala-vacia">Presiona Actualizar para buscar partidas</div></div>
+            <div class="btn-menu" onclick="actualizarSalas()">🔄 Actualizar</div>
+        </div>
+        <div class="btn-volver-menu" onclick="mostrarPantallaPrincipal()">← Volver</div>
+    </div>
+
+    <!-- BOTÓN MENÚ IN-GAME -->
+    <button id="btn-volver" style="
+        position:absolute; top:10px; left:10px;
+        background:rgba(0,0,0,0.6); color:white;
+        border:2px solid rgba(255,255,255,0.4);
+        border-radius:6px; padding:8px 14px;
+        font-size:14px; font-family:sans-serif;
+        pointer-events:auto; z-index:50;">
+        ← Menú
+    </button>
+
+    <!-- CROSSHAIR -->
+    <div id="crosshair">
+        <div class="cross-line v-line"></div>
+        <div class="cross-line h-line"></div>
+    </div>
+
+    <!-- BOTONES DE ACCIÓN -->
+    <div id="jump-btn"  class="action-button"><div class="arrow-up"></div></div>
+    <div id="place-btn" class="action-button"><div class="plus-icon">+</div></div>
+    <div id="break-btn" class="action-button"><div class="sword-icon-small"></div></div>
+    <div id="sneak-btn" class="action-button"><div class="arrow-up" style="transform:rotate(180deg)"></div></div>
+
+    <div id="save-load-btns" style="position:absolute; top:10px; right:10px; display:flex; gap:8px;"></div>
+
+    <!-- HOTBAR -->
+    <div id="hotbar-container">
+        <div class="hotbar-slot" id="slot-0" style="border: 4px solid white; pointer-events: auto;"></div>
+        <div class="hotbar-slot" id="slot-1" style="border: 4px solid rgba(139,139,139,0.5); pointer-events: auto;"></div>
+        <div class="hotbar-slot" id="slot-2" style="pointer-events: auto;"></div>
+        <div class="hotbar-slot" id="slot-3" style="pointer-events: auto;"></div>
+        <div class="hotbar-slot" id="slot-4" style="pointer-events: auto;"></div>
+        <div class="hotbar-slot" id="slot-5" style="pointer-events: auto;"></div>
+        <div class="hotbar-slot" id="slot-6" style="pointer-events: auto;"></div>
+        <div class="hotbar-slot" id="slot-7" style="pointer-events: auto;"></div>
+        <div class="hotbar-slot" id="slot-8" style="pointer-events: auto;"></div>
+        <div id="btn-inv" onclick="abrirInv()">···</div>
+    </div>
+
+    <!-- PANEL CREAR/EDITAR MUNDO -->
+    <div id="panel-mundo">
+        <div id="panel-mundo-caja">
+            <div id="panel-mundo-titulo">CREAR MUNDO</div>
+            <input id="panel-mundo-nombre" type="text" placeholder="Nombre del mundo" maxlength="30">
+            <div style="display:flex; gap:8px; margin-bottom:4px;">
+                <div class="tipo-btn activo" id="tipo-plano" onclick="seleccionarTipo('plano')">🌿 Plano</div>
+                <div class="tipo-btn" id="tipo-normal" onclick="seleccionarTipo('normal')">⛰️ Normal</div>
+            </div>
+            <div style="color:#aaa; font-family:'Courier New',monospace; font-size:clamp(9px,2vw,11px); margin-bottom:4px; letter-spacing:1px;">MODO DE JUEGO</div>
+            <div style="display:flex; gap:8px; margin-bottom:4px;">
+                <div class="tipo-btn activo" id="modo-creativo" onclick="seleccionarModo('creativo')">🎮 Creativo</div>
+                <div class="tipo-btn" id="modo-supervivencia" onclick="seleccionarModo('supervivencia')">⚔️ Supervivencia</div>
+            </div>
+            <div class="btn-crear-mundo" id="confirmar-mundo-btn" onclick="confirmarMundo()">Crear mundo</div>
+            <div class="btn-cancelar-mundo" onclick="cerrarPanelMundo()">Cancelar</div>
+        </div>
+    </div>
+
+    <!-- INVENTARIO -->
+    <div id="inv-overlay">
+        <div id="inv-caja">
+            <div style="display:flex; align-items:center; justify-content:center; position:relative; margin-bottom:8px;">
+                <div id="inv-titulo" style="margin:0;">Inventario</div>
+                <div onclick="cerrarInv()" style="position:absolute; right:0; cursor:pointer; font-size:18px; color:#555; font-weight:bold; font-family:monospace; line-height:1; padding:2px 6px; background:#aaa; border:2px solid #fff; border-right-color:#555; border-bottom-color:#555;">✕</div>
+            </div>
+            <div class="inv-grid" id="inv-main">
+                <div class="inv-s" data-idx="9"></div>
+                <div class="inv-s" data-idx="10"></div>
+                <div class="inv-s" data-idx="11"></div>
+                <div class="inv-s" data-idx="12"></div>
+                <div class="inv-s" data-idx="13"></div>
+                <div class="inv-s" data-idx="14"></div>
+                <div class="inv-s" data-idx="15"></div>
+                <div class="inv-s" data-idx="16"></div>
+                <div class="inv-s" data-idx="17"></div>
+                <div class="inv-s" data-idx="18"></div>
+                <div class="inv-s" data-idx="19"></div>
+                <div class="inv-s" data-idx="20"></div>
+                <div class="inv-s" data-idx="21"></div>
+                <div class="inv-s" data-idx="22"></div>
+                <div class="inv-s" data-idx="23"></div>
+                <div class="inv-s" data-idx="24"></div>
+                <div class="inv-s" data-idx="25"></div>
+                <div class="inv-s" data-idx="26"></div>
+                <div class="inv-s" data-idx="27"></div>
+                <div class="inv-s" data-idx="28"></div>
+                <div class="inv-s" data-idx="29"></div>
+                <div class="inv-s" data-idx="30"></div>
+                <div class="inv-s" data-idx="31"></div>
+                <div class="inv-s" data-idx="32"></div>
+                <div class="inv-s" data-idx="33"></div>
+                <div class="inv-s" data-idx="34"></div>
+                <div class="inv-s" data-idx="35"></div>
+            </div>
+            <div id="inv-separador"></div>
+            <div class="inv-grid" id="inv-hotbar">
+                <div class="inv-s activo" data-idx="0"></div>
+                <div class="inv-s" data-idx="1"></div>
+                <div class="inv-s" data-idx="2"></div>
+                <div class="inv-s" data-idx="3"></div>
+                <div class="inv-s" data-idx="4"></div>
+                <div class="inv-s" data-idx="5"></div>
+                <div class="inv-s" data-idx="6"></div>
+                <div class="inv-s" data-idx="7"></div>
+                <div class="inv-s" data-idx="8"></div>
+            </div>
+        </div>
+    </div>
+    <div id="inv-drag"></div>
+
+    <!-- OVERLAY AGUA -->
+    <div id="water-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,30,100,0.35); pointer-events:none; z-index:200;"></div>
+
+    <!-- OVERLAY EDICIÓN CONTROLES -->
+    <div id="edit-controles-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:40000; flex-direction:column; align-items:center; justify-content:flex-start; pointer-events:none;">
+        <div style="position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.45);"></div>
+        <div style="position:relative; z-index:2; width:100%; background:rgba(0,0,0,0.8); border-bottom:2px solid #555; display:flex; flex-direction:column; box-sizing:border-box; pointer-events:auto;">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px;">
+                <div style="color:#aaa; font-family:'Courier New',monospace; font-size:clamp(10px,2.5vw,13px);" id="edit-label">Toca un botón para editarlo</div>
+                <div style="display:flex; gap:6px;">
+                    <div onclick="undoEdicion()" id="btn-undo" style="background:#444; border:3px solid #000; color:#aaa; font-family:'Courier New',monospace; font-size:clamp(10px,2.5vw,12px); padding:6px 10px; cursor:pointer; box-shadow:inset -2px -2px #222, inset 2px 2px #666; pointer-events:auto;">↩</div>
+                    <div onclick="redoEdicion()" id="btn-redo" style="background:#444; border:3px solid #000; color:#aaa; font-family:'Courier New',monospace; font-size:clamp(10px,2.5vw,12px); padding:6px 10px; cursor:pointer; box-shadow:inset -2px -2px #222, inset 2px 2px #666; pointer-events:auto;">↪</div>
+                    <div onclick="resetearPosicionesControles()" style="background:#555; border:3px solid #000; color:white; font-family:'Courier New',monospace; font-size:clamp(10px,2.5vw,12px); padding:6px 12px; cursor:pointer; box-shadow:inset -2px -2px #222, inset 2px 2px #777; pointer-events:auto;">↺ Reset</div>
+                    <div onclick="salirModoEdicionControles()" style="background:#3a6a3a; border:3px solid #000; color:white; font-family:'Courier New',monospace; font-size:clamp(10px,2.5vw,12px); padding:6px 12px; cursor:pointer; box-shadow:inset -2px -2px #222, inset 2px 2px #5a9a5a; pointer-events:auto;">✓ Guardar</div>
+                </div>
+            </div>
+            <div id="edit-panel-sel" style="display:none; padding:8px 12px; border-top:1px solid #444; gap:16px; align-items:center; flex-wrap:wrap;">
+                <div style="color:#fff; font-family:'Courier New',monospace; font-size:clamp(10px,2.5vw,12px); font-weight:bold;" id="edit-sel-nombre">—</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="color:#aaa; font-family:'Courier New',monospace; font-size:clamp(9px,2vw,11px);">Tamaño</div>
+                    <input type="range" id="edit-sel-size" min="30" max="90" value="52" style="width:90px; touch-action:pan-x;" oninput="aplicarEdicionSeleccionado()" onchange="aplicarEdicionSeleccionado(true)">
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div style="color:#aaa; font-family:'Courier New',monospace; font-size:clamp(9px,2vw,11px);">Opacidad</div>
+                    <input type="range" id="edit-sel-opacity" min="5" max="100" value="45" style="width:90px; touch-action:pan-x;" oninput="aplicarEdicionSeleccionado()" onchange="aplicarEdicionSeleccionado(true)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE CARGA -->
+    <div id="pantalla-carga" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; flex-direction:column; align-items:center; justify-content:center;">
+        <div class="mc-logo">MINECRAFT CLONE</div>
+        <div class="mc-caja-outer">
+            <div class="mc-caja-titulo">Cargando.</div>
+            <div class="mc-caja-inner">
+                <div id="carga-tip" class="mc-tip"></div>
+                <div class="mc-barra-bg">
+                    <div id="barra-progreso-inner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE GUARDADO -->
+    <div id="pantalla-guardado" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; flex-direction:column; align-items:center; justify-content:center;">
+        <div class="mc-logo">MINECRAFT CLONE</div>
+        <div class="mc-caja-outer">
+            <div class="mc-caja-titulo">Guardando mundo</div>
+            <div class="mc-caja-inner" style="align-items:center; justify-content:center; padding:28px;">
+                <div style="color:#fff; font-size:clamp(13px,3vw,16px); margin-bottom:14px;">¡Hecho!</div>
+                <div class="mc-guardado-icono">
+                    <div class="mc-bloque"></div>
+                    <div class="mc-flecha"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap"> { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } } </script>
+    <script type="module" src="game.js"></script>
+</body>
+</html>
