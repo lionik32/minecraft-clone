@@ -6,13 +6,30 @@ import { CHUNK_SIZE, RENDER_DISTANCE_CHUNKS, capasTierra, MAX_PROFUNDIDAD_PIEDRA
 
 import { BLOCK_UVS } from './js/config/blocks.js';
 
-import { atlasArchivos, ATLAS_IDX, atlasUV, atlasTexture, atlasListo, cargarAtlas, loader, texSide, texTop, texBottom, texStone, texWood, atlasMaterial, actualizarAtlasMaterial } from './js/render/textures.js';
+import { oakLeavesMaterial, leafBlocks, leafChunkMeshes, agregarHoja, reconstruirTodasLasHojas, plantarArbol } from './js/world/trees.js';
+
+const texDirt = loader.load('textures/dirt.png');
+texDirt.magFilter = texDirt.minFilter = THREE.NearestFilter;
+texDirt.colorSpace = THREE.SRGBColorSpace;
+texDirt.generateMipmaps = false;
+const dirtMaterial = crearMaterialesUniformes(texDirt);
+
+const texGlassBlock = loader.load('textures/glass.png');
+texGlassBlock.magFilter = texGlassBlock.minFilter = THREE.NearestFilter;
+texGlassBlock.colorSpace = THREE.SRGBColorSpace;
+texGlassBlock.generateMipmaps = false;
+
+const texSand = loader.load('textures/sand.png');
+texSand.magFilter = texSand.minFilter = THREE.NearestFilter;
+texSand.colorSpace = THREE.SRGBColorSpace;
+texSand.generateMipmaps = false;
+const sandMaterial = crearMaterialesUniformes(texSand);
 
 let noise = new SimplexNoise(42);
 
 
 // 1. ESCENA Y CONFIGURACIÓN BÁSICA
-const scene = new THREE.Scene();
+export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xa0e6ff);
 scene.fog = new THREE.Fog(0xa0e6ff, 55, 65);
 
@@ -51,7 +68,7 @@ scene.add(luzAmbiente);
 
 
 
-function crearMeshManual(matType) {
+export function crearMeshManual(matType) {
     const mat = materialPorNombre[matType];
     const m = new THREE.Mesh(geometry, mat || materials);
     m.userData.matType = matType;
@@ -190,8 +207,7 @@ const texLeaves = loader.load('textures/leaves_oak.png');
 texLeaves.magFilter = texLeaves.minFilter = THREE.NearestFilter;
 texLeaves.colorSpace = THREE.SRGBColorSpace;
 texLeaves.generateMipmaps = false;
-const oakLeavesMaterial = crearMaterialesHojas(texLeaves);
-oakLeavesMaterial.forEach(m => { m.color.set(0x48b518); });
+
 
 const todosMateriales = [...materials, ...stoneMaterial, ...woodMaterial, ...dirtMaterial, ...glassMaterial, ...sandMaterial, ...ironMaterial, ...oakLogMaterial, ...oakLeavesMaterial, ...brickMaterial,
     ...matCRed, ...matCBlack, ...matCLGray, ...matCYellow, ...matCLBlue, ...matCOrange, ...matCMagenta, ...matCLime, ...matCBrown, ...waterMaterial];
@@ -638,7 +654,7 @@ verificarOcultarCarga();
     }
 };
 
-const manualBlocks = [];
+export const manualBlocks = [];
 const brokenInstances = new Map();
 const brokenTerrain = new Set();
 
