@@ -106,3 +106,9 @@ export function crearMaterialesUniformes(tex) {
 export const materials    = crearMateriales(texTop, texSide, texBottom);
 export const stoneMaterial = crearMaterialesUniformes(texStone);
 export const woodMaterial  = crearMaterialesUniformes(texWood);
+
+export const texSand = loader.load('textures/sand.png');
+texSand.magFilter = texSand.minFilter = THREE.NearestFilter;
+texSand.colorSpace = THREE.SRGBColorSpace;
+texSand.generateMipmaps = false;
+export const sandMaterial = crearMaterialesUniformes(texSand);

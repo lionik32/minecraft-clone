@@ -82,11 +82,7 @@ const glassMaterial = [
     new THREE.MeshBasicMaterial(_glassOpts(B_NS)),
 ];
 
-const texSand = loader.load('textures/sand.png');
-texSand.magFilter = texSand.minFilter = THREE.NearestFilter;
-texSand.colorSpace = THREE.SRGBColorSpace;
-texSand.generateMipmaps = false;
-const sandMaterial = crearMaterialesUniformes(texSand);
+
 
 const texWaterStill = loader.load('textures/water_still.png');
 const texWaterFlow  = loader.load('textures/water_flow.png');
