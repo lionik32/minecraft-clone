@@ -80,29 +80,40 @@ export function generarArbol(baseX, baseY, baseZ) {
         _manualBlocks.push(m);
     }
 
-    // Posiciones de hojas
+    // Posiciones de hojas (patrón Minecraft Bedrock - Small Oak)
     const hojasPos = [];
 
-    // Capas bajas: 5x5 sin esquinas diagonales
-    for (const dy of [-2, -1]) {
-        for (let dx = -2; dx <= 2; dx++) {
-            for (let dz = -2; dz <= 2; dz++) {
-                if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-                if (dx === 0 && dz === 0) continue;
-                hojasPos.push([baseX + dx, topY + dy, baseZ + dz]);
-            }
+    // dy=-2: 5x5 sin esquinas diagonales fijas, esquinas "medias" con 50% de prob
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue; // esquinas diagonales nunca
+            if (dx === 0 && dz === 0) continue; // tronco
+            const esBorde = Math.abs(dx) === 2 || Math.abs(dz) === 2;
+            if (esBorde && Math.random() < 0.5) continue; // bordes con 50% prob
+            hojasPos.push([baseX + dx, topY - 2, baseZ + dz]);
         }
     }
 
-    // Capas altas: 3x3 completo
-    for (const dy of [0, 1]) {
-        for (let dx = -1; dx <= 1; dx++) {
-            for (let dz = -1; dz <= 1; dz++) {
-                if (dx === 0 && dz === 0 && dy === 0) continue;
-                hojasPos.push([baseX + dx, topY + dy, baseZ + dz]);
-            }
+    // dy=-1: 5x5 sin esquinas diagonales (siempre)
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+            if (dx === 0 && dz === 0) continue;
+            hojasPos.push([baseX + dx, topY - 1, baseZ + dz]);
         }
     }
+
+    // dy=0: 3x3 sin esquinas (cruz +)
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+            if (Math.abs(dx) === 1 && Math.abs(dz) === 1) continue; // sin esquinas
+            if (dx === 0 && dz === 0) continue; // tronco
+            hojasPos.push([baseX + dx, topY, baseZ + dz]);
+        }
+    }
+
+    // dy=+1: solo 1 bloque encima del tronco
+    hojasPos.push([baseX, topY + 1, baseZ]);
 
     // Registrar posiciones primero para que el face culling funcione
     const marcadores = hojasPos.map(([x, y, z]) => {
