@@ -9,6 +9,7 @@ import { BLOCK_UVS } from './js/config/blocks.js';
 
 
 import { loader, crearMateriales, crearMaterialesUniformes, materials, stoneMaterial, woodMaterial, leavesMaterial } from './js/render/textures.js';
+import { initTrees, generarArbol } from './js/world/trees.js';
 
 const texDirt = loader.load('textures/dirt.png');
 texDirt.magFilter = texDirt.minFilter = THREE.NearestFilter;
@@ -712,6 +713,7 @@ velocityY = 0;
 isJumping = false;
 posicionAplicada = true;
 verificarOcultarCarga();
+if (tipo === 'plano') generarArbol(3, 1, 3);
         }
         setTimeout(esperarSpawn, 300);
     }
@@ -720,6 +722,7 @@ verificarOcultarCarga();
 export const manualBlocks = [];
 const brokenInstances = new Map();
 const brokenTerrain = new Set();
+initTrees({ scene, manualBlocks, activeChunks, chunkKey, brokenTerrain, crearMeshManual });
 
 const nombreMaterial = new Map([
     [materials,      'grass'],
