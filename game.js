@@ -6,7 +6,9 @@ import { CHUNK_SIZE, RENDER_DISTANCE_CHUNKS, capasTierra, MAX_PROFUNDIDAD_PIEDRA
 
 import { BLOCK_UVS } from './js/config/blocks.js';
 
-import { oakLeavesMaterial, leafBlocks, leafChunkMeshes, agregarHoja, reconstruirTodasLasHojas, plantarArbol } from './js/world/trees.js';
+
+
+import { loader, crearMateriales, crearMaterialesUniformes, materials, stoneMaterial, woodMaterial, leavesMaterial } from './js/render/textures.js';
 
 const texDirt = loader.load('textures/dirt.png');
 texDirt.magFilter = texDirt.minFilter = THREE.NearestFilter;
@@ -68,6 +70,7 @@ scene.add(luzAmbiente);
 
 
 
+// PON:
 export function crearMeshManual(matType) {
     const mat = materialPorNombre[matType];
     const m = new THREE.Mesh(geometry, mat || materials);
@@ -75,9 +78,83 @@ export function crearMeshManual(matType) {
     return m;
 }
 
+function crearMeshHojas(x, y, z) {
+    const faceData = [
+        { dir:[1,0,0],  verts:[[.5,-.5,-.5],[.5,.5,-.5],[.5,.5,.5],[.5,-.5,.5]] },
+        { dir:[-1,0,0], verts:[[-.5,-.5,.5],[-.5,.5,.5],[-.5,.5,-.5],[-.5,-.5,-.5]] },
+        { dir:[0,1,0],  verts:[[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5]] },
+        { dir:[0,-1,0], verts:[[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5]] },
+        { dir:[0,0,1],  verts:[[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5],[-.5,-.5,.5]] },
+        { dir:[0,0,-1], verts:[[-.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],[.5,-.5,-.5]] },
+    ];
 
+    function vecinoTipo(nx, ny, nz) {
+        for (const b of manualBlocks) {
+            if (Math.round(b.position.x) === nx &&
+                Math.round(b.position.y) === ny &&
+                Math.round(b.position.z) === nz) {
+                return b.userData.matType || 'solid';
+            }
+        }
+        const k = `${nx},${ny},${nz}`;
+        if (brokenTerrain.has(k)) return 'air';
+        const cx = Math.floor(nx / CHUNK_SIZE);
+        const cz = Math.floor(nz / CHUNK_SIZE);
+        const chunk = activeChunks.get(chunkKey(cx, cz));
+        if (chunk && chunk.allBlockSet && chunk.allBlockSet.has(k)) return 'solid';
+        return 'air';
+    }
 
+    const posArr = [], uvs = [], idxArr = [];
+    let vi = 0;
 
+    faceData.forEach(({ dir: [dx, dy, dz], verts }, fi) => {
+        const nx = x + dx, ny = y + dy, nz = z + dz;
+        const tipo = vecinoTipo(nx, ny, nz);
+        if (tipo !== 'air' && tipo !== 'oak_leaves') return;
+        if (tipo === 'oak_leaves' && fi % 2 !== 0) return;
+
+        // Coordenadas LOCALES (centradas en 0,0,0)
+        verts.forEach(([vx, vy, vz]) => posArr.push(vx, vy, vz));
+        uvs.push(0,0, 0,1, 1,1, 1,0);
+        idxArr.push(vi, vi+1, vi+2, vi, vi+2, vi+3);
+        vi += 4;
+    });
+
+    if (posArr.length === 0) return null;
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(idxArr);
+
+    const mesh = new THREE.Mesh(geo, leavesMaterial[0]);
+    mesh.position.set(x, y, z);
+    mesh.userData.matType = 'oak_leaves';
+    mesh.frustumCulled = false;
+    return mesh;
+}
+
+function reconstruirHojasVecinas(x, y, z) {
+    const dirs = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    dirs.forEach(([dx, dy, dz]) => {
+        const nx = x+dx, ny = y+dy, nz = z+dz;
+        const idx = manualBlocks.findIndex(b =>
+            Math.round(b.position.x) === nx &&
+            Math.round(b.position.y) === ny &&
+            Math.round(b.position.z) === nz &&
+            b.userData.matType === 'oak_leaves'
+        );
+        if (idx === -1) return;
+        const viejo = manualBlocks[idx];
+        scene.remove(viejo);
+        viejo.geometry.dispose();
+        const nuevo = crearMeshHojas(nx, ny, nz);
+        if (!nuevo) { manualBlocks.splice(idx, 1); return; }
+        scene.add(nuevo);
+        manualBlocks[idx] = nuevo;
+    });
+}
 
 const _glassOpts = (c) => ({
     map: texGlassBlock,
@@ -182,6 +259,11 @@ const matCMagenta = crearMaterialesUniformes(texCMagenta);
 const matCLime    = crearMaterialesUniformes(texCLime);
 const matCBrown   = crearMaterialesUniformes(texCBrown);
 
+
+
+
+
+
 const texOakLogTop = loader.load('textures/log_oak_top.png');
 texOakLogTop.magFilter = texOakLogTop.minFilter = THREE.NearestFilter;
 texOakLogTop.colorSpace = THREE.SRGBColorSpace;
@@ -192,24 +274,9 @@ texOakLogSide.colorSpace = THREE.SRGBColorSpace;
 texOakLogSide.generateMipmaps = false;
 const oakLogMaterial = crearMateriales(texOakLogTop, texOakLogSide, texOakLogTop);
 
-function crearMaterialesHojas(tex) {
-    const brightValues = [B_EW, B_EW, B_TOP, B_BOTTOM, B_NS, B_NS];
-    return brightValues.map(b => new THREE.MeshBasicMaterial({
-        map: tex,
-        color: new THREE.Color(b, b, b),
-        transparent: false,
-        alphaTest: 0.5,
-        depthWrite: true,
-        side: THREE.DoubleSide,
-    }));
-}
-const texLeaves = loader.load('textures/leaves_oak.png');
-texLeaves.magFilter = texLeaves.minFilter = THREE.NearestFilter;
-texLeaves.colorSpace = THREE.SRGBColorSpace;
-texLeaves.generateMipmaps = false;
 
 
-const todosMateriales = [...materials, ...stoneMaterial, ...woodMaterial, ...dirtMaterial, ...glassMaterial, ...sandMaterial, ...ironMaterial, ...oakLogMaterial, ...oakLeavesMaterial, ...brickMaterial,
+const todosMateriales = [...materials, ...stoneMaterial, ...woodMaterial, ...dirtMaterial, ...glassMaterial, ...sandMaterial, ...ironMaterial, ...oakLogMaterial, ...brickMaterial,
     ...matCRed, ...matCBlack, ...matCLGray, ...matCYellow, ...matCLBlue, ...matCOrange, ...matCMagenta, ...matCLime, ...matCBrown, ...waterMaterial];
 
 
@@ -516,9 +583,7 @@ window.iniciarMundo = function(tipo, esMulti) {
     for (const key of activeChunks.keys()) descargarChunk(key);
     manualBlocks.forEach(b => scene.remove(b));
     manualBlocks.length = 0;
-    leafBlocks.clear();
-    leafChunkMeshes.forEach(m => { scene.remove(m); m.geometry.dispose(); });
-    leafChunkMeshes.clear();
+    
     brokenInstances.clear();
     brokenTerrain.clear();
     sandBlocks.length = 0;
@@ -528,9 +593,7 @@ window.iniciarMundo = function(tipo, esMulti) {
     waterNiveles.clear();
     waterSources.clear();
 
-    if (!modoMultijugador && tipo === 'plano') {
-    plantarArbol(10, 1, 10);
-}
+    
 
     mundoIniciado = true;
     volarActivo = false;
@@ -668,8 +731,7 @@ const nombreMaterial = new Map([
     [ironMaterial,   'iron'],
     [brickMaterial,  'brick'],
     [waterMaterial,  'water'],
-    [oakLogMaterial,    'oaklog'],
-    [oakLeavesMaterial, 'oak_leaves'],
+    
     [matCRed,        'c_red'],
     [matCBlack,      'c_black'],
     [matCLGray,      'c_lgray'],
@@ -691,7 +753,7 @@ const materialPorNombre = {
     'brick':    brickMaterial,
     'water':       waterMaterial,
     'oaklog':      oakLogMaterial,
-    'oak_leaves':  oakLeavesMaterial,
+    'oak_leaves':  leavesMaterial,
     'c_red':     matCRed,
     'c_black':   matCBlack,
     'c_lgray':   matCLGray,
@@ -705,120 +767,7 @@ const materialPorNombre = {
 };
 const sandBlocks = [];
 
-const leafBlocks = new Map();
-const leafChunkMeshes = new Map();
 
-function leafChunkKey(cx, cz) { return `${cx},${cz}`; }
-
-function reconstruirHojasChunk(cx, cz) {
-    const key = leafChunkKey(cx, cz);
-    const viejo = leafChunkMeshes.get(key);
-    if (viejo) { scene.remove(viejo); viejo.geometry.dispose(); leafChunkMeshes.delete(key); }
-
-    // Reunir todos los bloques de hojas de todos los chunks para consultar vecinos
-    const todasHojas = new Set();
-    leafBlocks.forEach(bloques => bloques.forEach(([lx, ly, lz]) => todasHojas.add(`${lx},${ly},${lz}`)));
-
-    const bloques = leafBlocks.get(key);
-    if (!bloques || bloques.length === 0) return;
-
-    const faceData = [
-        { dir:[1,0,0],  verts:[[.5,-.5,-.5],[.5,.5,-.5],[.5,.5,.5],[.5,-.5,.5]],   bright: 0.6 },
-        { dir:[-1,0,0], verts:[[-.5,-.5,.5],[-.5,.5,.5],[-.5,.5,-.5],[-.5,-.5,-.5]], bright: 0.6 },
-        { dir:[0,1,0],  verts:[[-.5,.5,.5],[.5,.5,.5],[.5,.5,-.5],[-.5,.5,-.5]],   bright: 1.0 },
-        { dir:[0,-1,0], verts:[[-.5,-.5,-.5],[.5,-.5,-.5],[.5,-.5,.5],[-.5,-.5,.5]], bright: 0.5 },
-        { dir:[0,0,1],  verts:[[.5,-.5,.5],[.5,.5,.5],[-.5,.5,.5],[-.5,-.5,.5]],   bright: 0.8 },
-        { dir:[0,0,-1], verts:[[-.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],[.5,-.5,-.5]], bright: 0.8 },
-    ];
-
-    const pos = [], uvs = [], colors = [], idxArr = [];
-    let vi = 0;
-
-    const OFFSET = 0.001;
-    for (const [lx, ly, lz] of bloques) {
-        for (const { dir: [dx,dy,dz], verts, bright } of faceData) {
-            verts.forEach(([vx,vy,vz]) => {
-                pos.push(lx+vx+dx*OFFSET, ly+vy+dy*OFFSET, lz+vz+dz*OFFSET);
-                colors.push(bright, bright, bright);
-            });
-            uvs.push(0,0, 0,1, 1,1, 1,0);
-            idxArr.push(vi, vi+1, vi+2, vi, vi+2, vi+3);
-            vi += 4;
-        }
-    }
-
-    if (pos.length === 0) return;
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs, 2));
-    geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors, 3));
-    geo.setIndex(idxArr);
-
-    const mat = new THREE.MeshBasicMaterial({
-        map: texLeaves,
-        vertexColors: true,
-        alphaTest: 0.5,
-        transparent: false,
-        depthWrite: true,
-        side: THREE.DoubleSide,
-        color: new THREE.Color(0x48b518),
-        polygonOffset: true,
-        polygonOffsetFactor: -8,
-        polygonOffsetUnits: -8
-    });
-
-    geo.computeBoundingBox();
-    geo.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.userData.noCollision = false;
-    mesh.frustumCulled = true;
-    mesh.scale.set(0.999, 0.999, 0.999);
-    scene.add(mesh);
-    leafChunkMeshes.set(key, mesh);
-}
-
-function agregarHoja(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE);
-    const cz = Math.floor(z / CHUNK_SIZE);
-    const key = leafChunkKey(cx, cz);
-    if (!leafBlocks.has(key)) leafBlocks.set(key, []);
-    leafBlocks.get(key).push([x, y, z]);
-    reconstruirHojasChunk(cx, cz);
-}
-
-function reconstruirTodasLasHojas() {
-    leafBlocks.forEach((_, key) => {
-        const [cx, cz] = key.split(',').map(Number);
-        reconstruirHojasChunk(cx, cz);
-    });
-}
-
-function plantarArbol(x, y, z) {
-    const altura = 4;
-    for (let i = 0; i < altura; i++) {
-        const t = crearMeshManual('oaklog');
-        t.position.set(x, y + i, z);
-        scene.add(t);
-        manualBlocks.push(t);
-    }
-    const troncoTop = y + altura - 1;
-    for (let dx = -2; dx <= 2; dx++) {
-        for (let dz = -2; dz <= 2; dz++) {
-            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
-            if (dx === 0 && dz === 0) continue;
-            agregarHoja(x+dx, troncoTop,   z+dz);
-            agregarHoja(x+dx, troncoTop-1, z+dz);
-        }
-    }
-    for (let dx = -1; dx <= 1; dx++) {
-        for (let dz = -1; dz <= 1; dz++) {
-            if (dx === 0 && dz === 0) continue;
-            agregarHoja(x+dx, troncoTop+1, z+dz);
-        }
-    }
-    agregarHoja(x, troncoTop+2, z);
-}
 
 // ===== SISTEMA DE AGUA =====
 const waterPositions = new Set();
@@ -1229,10 +1178,6 @@ function guardarMundo() {
         const [x, y, z] = k.split(',').map(Number);
         return { x, y, z, mat: 'water', rx: 0, ry: 0, rz: 0, nivel: waterNiveles.get(k) ?? 0 };
     });
-    const hojasData = [];
-    leafBlocks.forEach(bloques => bloques.forEach(([lx, ly, lz]) => {
-        hojasData.push({ x: lx, y: ly, z: lz, mat: 'oak_leaves', rx: 0, ry: 0, rz: 0 });
-    }));
     const manualesData = [
         ...manualBlocks.map(b => ({
             x: b.position.x,
@@ -1243,7 +1188,6 @@ function guardarMundo() {
             ry: b.rotation.y,
             rz: b.rotation.z
         })),
-        ...hojasData,
         ...aguaData
     ];
     if (!mundoIdActual) return;
@@ -1293,24 +1237,30 @@ function cargarMundo() {
                 agregarAgua(x, y, z, false, nivel ?? 0);
                 return;
             }
+            
+            let b;
             if (mat === 'oak_leaves') {
-                agregarHoja(x, y, z);
-                return;
+                b = crearMeshHojas(x, y, z);
+                if (!b) return;
+            } else {
+                b = crearMeshManual(mat);
+                b.position.set(x, y, z);
+                if (rx) b.rotation.x = rx;
+                if (ry) b.rotation.y = ry;
+                if (rz) b.rotation.z = rz;
             }
-            const b = crearMeshManual(mat);
-            b.position.set(x, y, z);
-            if (rx) b.rotation.x = rx;
-            if (ry) b.rotation.y = ry;
-            if (rz) b.rotation.z = rz;
             scene.add(b);
             manualBlocks.push(b);
+            if (mat === 'oak_leaves') {
+                reconstruirHojasVecinas(x, y, z);
+            }
             if (mat === 'sand') {
                 b.userData.isSand = true;
                 b.userData.falling = true;
                 sandBlocks.push(b);
             }
         });
-        reconstruirTodasLasHojas();
+        
     }
 
     if (posicion) {
@@ -1427,7 +1377,7 @@ let lastSneakTap = 0;
 
 const raycaster = new THREE.Raycaster();
 raycaster.near = 0.1;
-raycaster.far = 5;
+raycaster.far = 12;
 const pointer = new THREE.Vector2(0, 0);
 
 const _rayCol1 = new THREE.Raycaster();
@@ -2351,13 +2301,17 @@ function aplicarEventoBloque(data) {
         );
         if (yaExiste) return;
         if (data.mat === 'water') waterSources.add(waterKey(data.x, data.y, data.z));
-        if (data.mat === 'oak_leaves') {
-            agregarHoja(data.x, data.y, data.z);
-        } else {
-            const b = crearMeshManual(data.mat);
-            b.position.set(data.x, data.y, data.z);
-            scene.add(b);
-            manualBlocks.push(b);
+        {
+            let b;
+if (data.mat === 'oak_leaves') {
+    b = crearMeshHojas(data.x, data.y, data.z);
+    if (!b) return;
+} else {
+    b = crearMeshManual(data.mat);
+    b.position.set(data.x, data.y, data.z);
+}
+scene.add(b);
+manualBlocks.push(b);
             if (data.mat === 'sand') {
                 b.userData.isSand = true;
                 b.userData.falling = true;
@@ -2498,17 +2452,8 @@ function getMeshesActivos() {
         Math.abs(b.position.x - camera.position.x) <= RENDER_DISTANCE &&
         Math.abs(b.position.z - camera.position.z) <= RENDER_DISTANCE
     );
-    const pcx = Math.floor(camera.position.x / CHUNK_SIZE);
-    const pcz = Math.floor(camera.position.z / CHUNK_SIZE);
-    const hojasArr = [...leafChunkMeshes.entries()]
-        .filter(([k]) => {
-            const [cx, cz] = k.split(',').map(Number);
-            return Math.abs(cx - pcx) <= 2 && Math.abs(cz - pcz) <= 2;
-        })
-        .map(([, m]) => m);
-    _cacheMeshesActivos = [...getChunkMeshes(), ...cercanos, ...waterMeshes.values(), ...hojasArr];
-    const hojasColision = [...leafChunkMeshes.values()];
-    _cacheMeshesSolidos = [...getChunkMeshes(), ...cercanos.filter(b => !b.userData.isWater && !b.userData.noCollision), ...hojasColision];
+    _cacheMeshesActivos = [...getChunkMeshes(), ...cercanos, ...waterMeshes.values()];
+    _cacheMeshesSolidos = [...getChunkMeshes(), ...cercanos.filter(b => !b.userData.isWater && !b.userData.noCollision)];
     _cacheMeshesFrame = hitFrame;
     return _cacheMeshesActivos;
 }
@@ -2549,7 +2494,7 @@ function realizarAccion(tipo) {
 
     const hits = tipo === 'poner' ? hitsPoner : hitsRomper;
 
-    if (hits.length > 0 && hits[0].distance <= 4.5) {
+    if (hits.length > 0 && hits[0].distance <= 12) {
         const target = hits[0].object;
 
         if (tipo === 'romper') {
@@ -2562,24 +2507,15 @@ function realizarAccion(tipo) {
                 const bx = Math.round(target.position.x);
                 const by = Math.round(target.position.y);
                 const bz = Math.round(target.position.z);
-                if ([...leafChunkMeshes.values()].includes(target)) {
-                    const hit0 = hits[0];
-                    const n = hit0.face.normal;
-                    const bx = Math.round(hit0.point.x - n.x * 0.5);
-                    const by = Math.round(hit0.point.y - n.y * 0.5);
-                    const bz = Math.round(hit0.point.z - n.z * 0.5);
-                    leafBlocks.forEach((bloques, key) => {
-                        const idx = bloques.findIndex(([lx,ly,lz]) => lx===bx && ly===by && lz===bz);
-                        if (idx !== -1) {
-                            bloques.splice(idx, 1);
-                            const [cx, cz] = key.split(',').map(Number);
-                            reconstruirHojasChunk(cx, cz);
-                        }
-                    });
-                } else {
+                {
+                    const bxR = Math.round(target.position.x);
+                    const byR = Math.round(target.position.y);
+                    const bzR = Math.round(target.position.z);
+                    const eraHoja = target.userData.matType === 'oak_leaves';
                     scene.remove(target);
                     const idx = manualBlocks.indexOf(target);
                     if (idx !== -1) manualBlocks.splice(idx, 1);
+                    if (eraHoja) reconstruirHojasVecinas(bxR, byR, bzR);
                 }
                 if (socket && socket.readyState === 1) {
                     socket.send(JSON.stringify({ type: 'block_break', x: target.position.x, y: target.position.y, z: target.position.z, mundo: tipoMundoActual, salaId: salaIdActual }));
@@ -2638,9 +2574,12 @@ function realizarAccion(tipo) {
                             }
                             const b = crearMeshManual(matSeleccionada);
                             b.position.set(wx, wy, wz);
-                            scene.add(b);
-                            manualBlocks.push(b);
-                            if (socket && socket.readyState === 1) {
+                           scene.add(b);
+manualBlocks.push(b);
+if (invSlots[selectedSlot]?.mat === 'oak_leaves') {
+    reconstruirHojasVecinas(pos.x, pos.y, pos.z);
+}
+if (socket && socket.readyState === 1) {
                                 socket.send(JSON.stringify({ type: 'block_place', x: wx, y: wy, z: wz, mat: matSeleccionada || 'grass', mundo: tipoMundoActual, salaId: salaIdActual }));
                             }
                         }
@@ -2653,7 +2592,7 @@ function realizarAccion(tipo) {
                 const matrix = new THREE.Matrix4();
                 target.getMatrixAt(hits[0].instanceId, matrix);
                 instancePos.setFromMatrixPosition(matrix);
-            } else if (target.userData.isChunk || [...leafChunkMeshes.values()].includes(target)) {
+            } else if (target.userData.isChunk) {
                 const n = hits[0].face.normal;
                 instancePos.set(Math.round(hits[0].point.x - n.x * 0.5), Math.round(hits[0].point.y - n.y * 0.5), Math.round(hits[0].point.z - n.z * 0.5));
             } else { instancePos.copy(target.position); }
@@ -2682,10 +2621,29 @@ function realizarAccion(tipo) {
                     }
                     return;
                 }
-                const b = crearMeshManual(invSlots[selectedSlot]?.mat);
-                b.position.copy(pos);
+                let b;
+if (invSlots[selectedSlot]?.mat === 'oak_leaves') {
+    b = crearMeshHojas(pos.x, pos.y, pos.z);
+    if (!b) return;
+} else {
+    b = crearMeshManual(invSlots[selectedSlot]?.mat);
+    b.position.copy(pos);
+}
+                if (invSlots[selectedSlot]?.mat === 'oaklog') {
+                    const absX = Math.abs(faceNormal.x);
+                    const absY = Math.abs(faceNormal.y);
+                    const absZ = Math.abs(faceNormal.z);
+                    if (absX > absY && absX > absZ) {
+                        b.rotation.z = Math.PI / 2;
+                    } else if (absZ > absX && absZ > absY) {
+                        b.rotation.x = Math.PI / 2;
+                    }
+                }
                 scene.add(b);
                 manualBlocks.push(b);
+                if (invSlots[selectedSlot]?.mat === 'oak_leaves') {
+                    reconstruirHojasVecinas(pos.x, pos.y, pos.z);
+                }
                 if (socket && socket.readyState === 1) {
                     socket.send(JSON.stringify({ type: 'block_place', x: pos.x, y: pos.y, z: pos.z, mat: invSlots[selectedSlot]?.mat || 'grass', mundo: tipoMundoActual, salaId: salaIdActual }));
                 }
@@ -3150,21 +3108,13 @@ if (mundoIniciado && posicionAplicada) {
 
     if (!hit) { outline.visible = false; }
 
-    if (hit && hit.distance <= 4.5) {
+    if (hit && hit.distance <= 12) {
         outline.visible = true;
         if (hit.object instanceof THREE.InstancedMesh) {
             hit.object.getMatrixAt(hit.instanceId, tempMatrix);
             outline.position.setFromMatrixPosition(tempMatrix);
             outline.rotation.set(0, 0, 0);
         } else if (hit.object.userData.isChunk) {
-            const n = hit.face.normal;
-            outline.position.set(
-                Math.round(hit.point.x - n.x * 0.5),
-                Math.round(hit.point.y - n.y * 0.5),
-                Math.round(hit.point.z - n.z * 0.5)
-            );
-            outline.rotation.set(0, 0, 0);
-        } else if ([...leafChunkMeshes.values()].includes(hit.object)) {
             const n = hit.face.normal;
             outline.position.set(
                 Math.round(hit.point.x - n.x * 0.5),

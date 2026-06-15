@@ -112,3 +112,21 @@ texSand.magFilter = texSand.minFilter = THREE.NearestFilter;
 texSand.colorSpace = THREE.SRGBColorSpace;
 texSand.generateMipmaps = false;
 export const sandMaterial = crearMaterialesUniformes(texSand);
+
+export const texLeaves = loader.load('textures/leaves_oak.png');
+texLeaves.magFilter = texLeaves.minFilter = THREE.NearestFilter;
+texLeaves.colorSpace = THREE.SRGBColorSpace;
+texLeaves.generateMipmaps = false;
+
+const _leavesOpts = () => new THREE.MeshBasicMaterial({
+    map: texLeaves,
+    color: new THREE.Color(0x48b518),
+    transparent: true,
+    alphaTest: 0.5,
+    side: THREE.DoubleSide,
+    depthWrite: true,
+});
+export const leavesMaterial = [
+    _leavesOpts(), _leavesOpts(), _leavesOpts(),
+    _leavesOpts(), _leavesOpts(), _leavesOpts(),
+];
