@@ -69,7 +69,7 @@ function crearMeshHojas(x, y, z) {
 }
 
 export function generarArbol(baseX, baseY, baseZ) {
-    const h = 4 + Math.floor(Math.random() * 3);
+    const h = 4 + Math.floor(Math.random() * 4);
     const topY = baseY + h;
 
     // Tronco
@@ -86,7 +86,7 @@ export function generarArbol(baseX, baseY, baseZ) {
     // dy=-2: 5x5 sin esquinas diagonales fijas, esquinas "medias" con 50% de prob
     for (let dx = -2; dx <= 2; dx++) {
         for (let dz = -2; dz <= 2; dz++) {
-            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue; // esquinas diagonales nunca
+            if (Math.abs(dx) === 2 && Math.abs(dz) === 2 && Math.random() > 0.5) continue; // esquinas diagonales nunca
             if (dx === 0 && dz === 0) continue; // tronco
             const esBorde = Math.abs(dx) === 2 || Math.abs(dz) === 2;
             if (esBorde && Math.random() < 0.5) continue; // bordes con 50% prob
@@ -97,7 +97,7 @@ export function generarArbol(baseX, baseY, baseZ) {
     // dy=-1: 5x5 sin esquinas diagonales (siempre)
     for (let dx = -2; dx <= 2; dx++) {
         for (let dz = -2; dz <= 2; dz++) {
-            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+            if (Math.abs(dx) === 2 && Math.abs(dz) === 2 && Math.random() > 0.5) continue;
             if (dx === 0 && dz === 0) continue;
             hojasPos.push([baseX + dx, topY - 1, baseZ + dz]);
         }
